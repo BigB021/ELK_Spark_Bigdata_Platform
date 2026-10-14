@@ -1,0 +1,110 @@
+{
+  "index_patterns": [
+    "ed-rejects-*"
+  ],
+  "priority": 200,
+  "_meta": {
+    "description": "Rejected / dead-lettered ED events: kept for audit, never silently dropped (TP4)",
+    "version": 2
+  },
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s"
+    },
+    "mappings": {
+      "dynamic": false,
+      "date_detection": false,
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "record_id": {
+          "type": "keyword"
+        },
+        "stay_id": {
+          "type": "keyword"
+        },
+        "patient_id": {
+          "type": "keyword"
+        },
+        "reject_reasons": {
+          "type": "keyword"
+        },
+        "raw_line": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 2048
+            }
+          }
+        },
+        "original": {
+          "type": "object",
+          "dynamic": true
+        },
+        "dq": {
+          "properties": {
+            "status": {
+              "type": "keyword"
+            },
+            "issue_count": {
+              "type": "byte"
+            },
+            "issues": {
+              "type": "keyword"
+            },
+            "anomaly_categories": {
+              "type": "keyword"
+            }
+          }
+        },
+        "dlq": {
+          "properties": {
+            "reason": {
+              "type": "text"
+            },
+            "plugin_id": {
+              "type": "keyword"
+            },
+            "plugin_type": {
+              "type": "keyword"
+            },
+            "entry_time": {
+              "type": "keyword"
+            }
+          }
+        },
+        "ingest": {
+          "properties": {
+            "run_id": {
+              "type": "keyword"
+            },
+            "pipeline": {
+              "type": "keyword"
+            },
+            "source_file": {
+              "type": "keyword"
+            },
+            "ingested_at": {
+              "type": "date"
+            }
+          }
+        }
+      },
+      "dynamic_templates": [
+        {
+          "original_as_keyword": {
+            "path_match": "original.*",
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        }
+      ]
+    }
+  }
+}

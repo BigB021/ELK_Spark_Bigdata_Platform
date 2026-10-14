@@ -1,0 +1,11 @@
+# Two pipelines run in the logstash container:
+#  - ed-visits : CSV -> parse / convert / normalize / quality control -> ES (+ rejects)
+#  - ed-dlq    : dead letter queue of ed-visits -> ed-rejects-dlq (nothing is lost)
+- pipeline.id: ed-visits
+  path.config: "/usr/share/logstash/pipeline/ed-visits.conf"
+  pipeline.workers: 2
+  pipeline.batch.size: 250
+
+- pipeline.id: ed-dlq
+  path.config: "/usr/share/logstash/pipeline/ed-dlq.conf"
+  pipeline.workers: 1

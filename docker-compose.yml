@@ -1,0 +1,230 @@
+# =============================================================================
+#  Plateforme Big Data ED (urgences) : Elasticsearch x2 + Kibana + Logstash + Spark
+#  TP3 (Jalon 1 - infrastructure) + TP4 (Jalon 2 - pipeline d'ingestion)
+#
+#  "Machines" of the TP mapped to containers (fixed hostname + static IP):
+#    ELK-01      es01 (172.28.0.11)  + kibana (172.28.0.13)
+#    ELK-02      es02 (172.28.0.12)
+#    LOGSTASH-01 logstash (172.28.0.14)
+#    SPARK-01    spark-master (172.28.0.21) + spark-worker (172.28.0.22)
+#
+#  Usage:  docker compose up -d                       (whole platform)
+#          docker compose --profile test run --rm logstash-test   (anomaly fixtures)
+# =============================================================================
+name: ed-bigdata
+
+x-es-common: &es-common
+  image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+  mem_limit: ${ES_MEM_LIMIT}
+  ulimits:
+    memlock: { soft: -1, hard: -1 }
+    nofile: { soft: 65536, hard: 65536 }
+  environment:
+    ES_JAVA_OPTS: -Xms${ES_HEAP} -Xmx${ES_HEAP}
+  healthcheck:
+    test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health?wait_for_status=yellow\\&timeout=5s >/dev/null"]
+    interval: 10s
+    timeout: 10s
+    retries: 30
+    start_period: 30s
+  restart: unless-stopped
+
+x-spark-common: &spark-common
+  image: ${SPARK_IMAGE}
+  environment:
+    SPARK_DAEMON_MEMORY: 256m
+    ES_SPARK_CONNECTOR: ${ES_SPARK_CONNECTOR}
+  volumes:
+    - ./datasets:/data:ro
+    - ./spark/jobs:/opt/spark/jobs:ro
+    - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+    - ./spark/output:/opt/spark/output
+  restart: unless-stopped
+
+services:
+  # ---------------------------------------------------------------- ELK-01 --
+  es01:
+    <<: *es-common
+    container_name: es01
+    hostname: elk-01
+    volumes:
+      - ./elasticsearch/config/es01.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - es01-data:/usr/share/elasticsearch/data
+    ports:
+      - "127.0.0.1:9200:9200"
+    networks:
+      bigdata-net:
+        ipv4_address: 172.28.0.11
+        aliases: [elk-01]
+
+  # ---------------------------------------------------------------- ELK-02 --
+  es02:
+    <<: *es-common
+    container_name: es02
+    hostname: elk-02
+    volumes:
+      - ./elasticsearch/config/es02.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - es02-data:/usr/share/elasticsearch/data
+    ports:
+      - "127.0.0.1:9201:9200"
+    networks:
+      bigdata-net:
+        ipv4_address: 172.28.0.12
+        aliases: [elk-02]
+
+  # ---------------------------------------------------- Kibana (on ELK-01) --
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    container_name: kibana
+    hostname: elk-01-kibana
+    mem_limit: ${KB_MEM_LIMIT}
+    environment:
+      NODE_OPTIONS: --max-old-space-size=768
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    ports:
+      - "127.0.0.1:5601:5601"
+    depends_on:
+      es01: { condition: service_healthy }
+      es02: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 60s
+    networks:
+      bigdata-net:
+        ipv4_address: 172.28.0.13
+    restart: unless-stopped
+
+  # ------------------------------------- one-shot bootstrap (templates, views) --
+  setup:
+    image: ${CURL_IMAGE}
+    container_name: setup
+    entrypoint: ["sh", "/setup/setup.sh"]
+    volumes:
+      - ./setup:/setup:ro
+      - ./elasticsearch/templates:/templates:ro
+      - ./kibana/ed-dashboards.ndjson:/kibana/ed-dashboards.ndjson:ro
+    depends_on:
+      es01: { condition: service_healthy }
+      es02: { condition: service_healthy }
+      kibana: { condition: service_healthy }
+    networks:
+      - bigdata-net
+    restart: "no"
+
+  # ----------------------------------------------------------- LOGSTASH-01 --
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: logstash
+    hostname: logstash-01
+    mem_limit: ${LS_MEM_LIMIT}
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx${LS_HEAP}
+      INPUT_FILE: /data/ed_synthetic_visits.csv
+      RUN_ID: main
+      EXIT_AFTER_READ: "false"
+    # Fresh rejected-file on each run (input is re-read from scratch: sincedb=/dev/null)
+    entrypoint: ["bash", "-c", "rm -f /usr/share/logstash/output/rejected-main.ndjson && exec /usr/local/bin/docker-entrypoint"]
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./logstash/scripts:/usr/share/logstash/scripts:ro
+      - ./logstash/output:/usr/share/logstash/output
+      - ./datasets:/data:ro
+      - ls-data:/usr/share/logstash/data
+    ports:
+      - "127.0.0.1:9600:9600"
+    depends_on:
+      setup: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9600/_node/pipelines >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks:
+      bigdata-net:
+        ipv4_address: 172.28.0.14
+        aliases: [logstash-01]
+    restart: unless-stopped
+
+  # Same pipeline, run once against the anomaly fixtures -> ed-visits-test / ed-rejects-test
+  logstash-test:
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    profiles: ["test"]
+    mem_limit: ${LS_MEM_LIMIT}
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx${LS_HEAP}
+      INPUT_FILE: /fixtures/ed_anomaly_samples.csv
+      RUN_ID: test
+      EXIT_AFTER_READ: "true"
+    entrypoint: ["bash", "-c", "rm -f /usr/share/logstash/output/rejected-test.ndjson && exec logstash --path.settings /usr/share/logstash/config -w 1 -f /usr/share/logstash/pipeline/ed-visits.conf"]
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./logstash/scripts:/usr/share/logstash/scripts:ro
+      - ./logstash/output:/usr/share/logstash/output
+      - ./tests/fixtures:/fixtures:ro
+    depends_on:
+      setup: { condition: service_completed_successfully }
+    networks:
+      - bigdata-net
+    restart: "no"
+
+  # -------------------------------------------------------------- SPARK-01 --
+  spark-master:
+    <<: *spark-common
+    container_name: spark-master
+    hostname: spark-01
+    mem_limit: ${SPARK_MASTER_MEM_LIMIT}
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master",
+              "--host", "spark-master", "--port", "7077", "--webui-port", "8080"]
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:7077:7077"
+      - "127.0.0.1:4040:4040"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    networks:
+      bigdata-net:
+        ipv4_address: 172.28.0.21
+        aliases: [spark-01]
+
+  spark-worker:
+    <<: *spark-common
+    container_name: spark-worker
+    hostname: spark-01-worker
+    mem_limit: ${SPARK_WORKER_MEM_LIMIT}
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker",
+              "spark://spark-master:7077",
+              "--cores", "${SPARK_WORKER_CORES}", "--memory", "${SPARK_WORKER_MEMORY}",
+              "--webui-port", "8081"]
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      spark-master: { condition: service_healthy }
+    networks:
+      bigdata-net:
+        ipv4_address: 172.28.0.22
+
+networks:
+  bigdata-net:
+    name: bigdata-net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+volumes:
+  es01-data:
+  es02-data:
+  ls-data:

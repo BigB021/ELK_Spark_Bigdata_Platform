@@ -1,0 +1,18 @@
+# ======================= Logstash (LOGSTASH-01) =======================
+node.name: logstash-01
+
+# Monitoring API (events in/out per pipeline & per plugin): http://localhost:9600
+api.http.host: 0.0.0.0
+api.http.port: 9600
+
+# Plain field names (no ECS renaming of host/path/message)
+pipeline.ecs_compatibility: disabled
+
+# Dead Letter Queue: events refused by Elasticsearch (mapping errors, 400/404)
+# are written to disk and re-processed by the `ed-dlq` pipeline.
+dead_letter_queue.enable: true
+dead_letter_queue.flush_interval: 2000
+
+xpack.monitoring.enabled: false
+config.reload.automatic: false
+log.level: info

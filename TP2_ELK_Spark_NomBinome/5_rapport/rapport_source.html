@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>TP4 - Conception des données et pipeline Logstash</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  :root { --ink:#1f2933; --muted:#52606d; --accent:#1d4e89; --soft:#eef3f9; --line:#cbd2d9; --warn:#fff4e5; --warnb:#e8a33d; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 19pt; color: var(--accent); margin: 0 0 6pt; border-bottom: 2px solid var(--accent); padding-bottom: 4pt; page-break-before: always; }
+  h1.first { page-break-before: auto; }
+  h2 { font-size: 13.5pt; color: var(--accent); margin: 16pt 0 6pt; }
+  h3 { font-size: 11.5pt; margin: 12pt 0 4pt; }
+  p { margin: 4pt 0 7pt; }
+  ul, ol { margin: 3pt 0 8pt 0; padding-left: 18pt; }
+  li { margin: 1.5pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9.3pt; page-break-inside: avoid; }
+  th { background: var(--accent); color: #fff; text-align: left; padding: 4pt 6pt; font-weight: 600; }
+  td { border-bottom: 1px solid var(--line); padding: 3.5pt 6pt; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fb; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  tr.total td { font-weight: 700; background: var(--soft); }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 8.8pt; background: #f0f2f5; padding: 0 2pt; border-radius: 2pt; }
+  pre { font-family: Consolas, monospace; font-size: 8.2pt; background: #1e1e2e; color: #d4d4d4; padding: 7pt 9pt; border-radius: 4pt;
+        white-space: pre-wrap; page-break-inside: avoid; margin: 5pt 0 9pt; }
+  figure { margin: 8pt 0 12pt; page-break-inside: avoid; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid var(--line); border-radius: 3pt; }
+  figure.tall img { max-height: 225mm; }
+  figure.mid img { max-height: 120mm; }
+  figcaption { font-size: 8.8pt; color: var(--muted); margin-top: 3pt; font-style: italic; }
+  .box { background: var(--soft); border-left: 4px solid var(--accent); padding: 6pt 10pt; margin: 8pt 0; page-break-inside: avoid; }
+  .todo { background: var(--warn); border-left: 4px solid var(--warnb); padding: 6pt 10pt; margin: 8pt 0; page-break-inside: avoid; }
+  .kpis { display: flex; gap: 6pt; margin: 8pt 0 10pt; }
+  .kpi { flex: 1; background: var(--soft); border-radius: 4pt; padding: 6pt; text-align: center; }
+  .kpi b { display: block; font-size: 16pt; color: var(--accent); }
+  .kpi span { font-size: 8.5pt; color: var(--muted); }
+  /* cover */
+  .cover { height: 250mm; display: flex; flex-direction: column; }
+  .cover .school { text-align: center; color: var(--muted); font-size: 10pt; letter-spacing: .3pt; }
+  .cover .mid { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .cover .tag { color: var(--accent); font-weight: 700; letter-spacing: 1pt; font-size: 10pt; }
+  .cover .title { font-size: 27pt; font-weight: 700; line-height: 1.15; margin: 6pt 0 10pt; color: var(--ink); }
+  .cover .sub { font-size: 13pt; color: var(--muted); }
+  .cover table { width: 70%; font-size: 10.5pt; margin-top: 22pt; }
+  .cover td { border: none; padding: 3pt 0; background: none !important; }
+  .cover td:first-child { color: var(--muted); width: 38%; }
+  .toc { page-break-before: always; page-break-after: always; }
+  .keep { break-inside: avoid; page-break-inside: avoid; }
+  .toc ol { font-size: 11pt; line-height: 1.9; }
+  .two { display: flex; gap: 10pt; } .two > * { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ============================== COUVERTURE ============================== -->
+<section class="cover">
+  <div class="school">École Nationale Supérieure de l'Intelligence Artificielle et Sciences des Données - Taroudant</div>
+  <div class="mid">
+    <div class="tag">TP 4 · JALON 2 · PROJET FIL ROUGE ELK + SPARK</div>
+    <div class="title">Conception des données et développement d'un pipeline Logstash</div>
+    <div class="sub">Plateforme Big Data de supervision des passages aux urgences (ED)</div>
+    <table>
+      <tr><td>Binôme</td><td><b>[Nom Prénom 1] · [Nom Prénom 2]</b></td></tr>
+      <tr><td>Encadrant</td><td>L. KARBIL</td></tr>
+      <tr><td>Livrable</td><td>TP2_ELK_Spark_NomBinome</td></tr>
+      <tr><td>Stack</td><td>Elasticsearch 8.17.4 (2 nœuds) · Logstash 8.17.4 · Kibana 8.17.4 · Spark 3.5.5</td></tr>
+      <tr><td>Date</td><td>Octobre 2026</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="toc">
+  <h1 class="first">Sommaire</h1>
+  <ol>
+    <li>Scénario métier (Mission 1)</li>
+    <li>Jeu de données synthétiques (Mission 2)</li>
+    <li>Modèle de données et mapping Elasticsearch (Mission 3)</li>
+    <li>Installation et configuration de Logstash (Mission 4)</li>
+    <li>Transformation, contrôle qualité et ingestion (Mission 5)</li>
+    <li>Vérification dans Elasticsearch et Kibana (Mission 6)</li>
+    <li>Préparation du prochain jalon : traitements Spark (Mission 7)</li>
+    <li>Difficultés rencontrées</li>
+    <li>Conclusion et reproduction</li>
+  </ol>
+  <div class="box"><b>En une phrase.</b> 5 000 passages aux urgences synthétiques sont lus par un pipeline Logstash. Le pipeline
+  type, normalise et contrôle chaque enregistrement selon 9 catégories d'anomalies, puis route les événements :
+  <b>4 908 indexés</b> (dont 312 corrigés et tracés), <b>92 rejetés</b> et conservés pour audit, <b>0</b> en dead letter queue.
+  Le bilan <b>5 000 = 4 908 + 92 + 0</b> est vérifié automatiquement.</div>
+</section>
+
+<!-- ============================== 1. SCENARIO ============================== -->
+<h1>1. Scénario métier</h1>
+<h2>1.1 Domaine et besoin</h2>
+<p>Le service des urgences (<i>Emergency Department</i>, ED) d'un hôpital enregistre chaque passage : arrivée, triage,
+constantes vitales, motif de consultation, diagnostic et orientation de sortie. La direction veut une plateforme de
+supervision qui réponde à quatre besoins :</p>
+<ul>
+  <li><b>Pilotage de l'activité :</b> volumes de passages par heure, jour et mois, pour dimensionner les équipes.</li>
+  <li><b>Gravité et parcours :</b> répartition par niveau de triage ESI (<i>Emergency Severity Index</i>, 1 = vital à 5 = non urgent),
+      durées de séjour (LOS), taux d'hospitalisation.</li>
+  <li><b>Gestion des lits :</b> identifier les diagnostics qui mènent le plus souvent à une hospitalisation ou à un séjour prolongé.</li>
+  <li><b>Qualité de la donnée :</b> les saisies aux urgences sont faites dans l'urgence. La plateforme doit détecter, corriger ou isoler les
+      erreurs sans en perdre la trace.</li>
+</ul>
+<h2>1.2 Données nécessaires et analyses envisagées</h2>
+<table>
+  <tr><th>Besoin</th><th>Données nécessaires</th><th>Analyse envisagée</th></tr>
+  <tr><td>Activité</td><td>date/heure d'arrivée</td><td>histogrammes temporels, heatmap jour × heure</td></tr>
+  <tr><td>Gravité / parcours</td><td>ESI, dates d'arrivée et de départ, disposition</td><td>LOS par ESI, taux d'hospitalisation</td></tr>
+  <tr><td>Lits</td><td>diagnostic ICD-10, disposition, LOS</td><td>classement des diagnostics à risque</td></tr>
+  <tr><td>Clinique</td><td>constantes vitales (FC, PA, SpO2, T°, FR, douleur)</td><td>indicateurs dérivés (shock index, fièvre)</td></tr>
+  <tr><td>Qualité</td><td>statut et anomalies par enregistrement</td><td>tableau de bord qualité, suivi des rejets</td></tr>
+</table>
+<p>Ces besoins justifient les 24 champs retenus (section 2) et les champs dérivés calculés par le pipeline (section 5).</p>
+
+<!-- ============================== 2. DONNEES ============================== -->
+<h1>2. Jeu de données synthétiques</h1>
+<h2>2.1 Origine et méthode de génération</h2>
+<p>Le jeu <code>ed_synthetic_visits.csv</code> est une <b>version augmentée et entièrement synthétique</b> du jeu public
+<b>MIMIC-IV-ED demo</b>. Les tables <code>edstays</code>, <code>triage</code>, <code>diagnosis</code> et <code>medrecon</code> en ont fourni le schéma et les distributions. Aucune donnée
+réelle n'est utilisée : les patients sont des identifiants <code>SYN-P…</code>, les séjours <code>SYN-S…</code>, et les dates sont
+projetées sur janvier 2025 → juin 2026.</p>
+<ul>
+  <li><b>Étape 1 - enregistrements conformes :</b> tirage des modalités selon les fréquences de la démo. Le diagnostic ICD-10 est cohérent avec le motif, les constantes avec la gravité, l'hospitalisation est plus fréquente en ESI 1-2. La durée de séjour est calculée à partir des dates.</li>
+  <li><b>Étape 2 - anomalies contrôlées :</b> injection d'au moins 5 % d'anomalies réparties en catégories connues (section 2.4).</li>
+  <li><b>Format :</b> CSV UTF-8, séparateur virgule, guillemets pour les textes contenant des virgules, fins de ligne LF, 1 ligne d'en-tête.</li>
+</ul>
+<div class="todo"><b>À compléter par le binôme :</b> préciser l'outil et les paramètres exacts de l'augmentation (script, graine aléatoire,
+proportions d'anomalies) pour satisfaire l'exigence de méthode de génération reproductible. Le fichier livré reste la référence figée,
+et toutes les mesures de ce rapport portent sur ce fichier.</div>
+
+<h2>2.2 Conformité aux contraintes minimales</h2>
+<table>
+  <tr><th>Contrainte TP4</th><th>Exigé</th><th>Obtenu</th></tr>
+  <tr><td>Enregistrements distincts</td><td>≥ 5 000</td><td><b>5 000</b> (5 000 <code>record_id</code> et 4 992 <code>stay_id</code> uniques, 8 vides)</td></tr>
+  <tr><td>Champs pertinents</td><td>≥ 12</td><td><b>24</b> champs sources + 18 champs dérivés / techniques</td></tr>
+  <tr><td>Catégories métier</td><td>≥ 5</td><td>disposition (8), mode d'arrivée (6), origine (8), ESI (5), 26 diagnostics, 52 motifs</td></tr>
+  <tr><td>Enregistrements conformes</td><td>≥ 95 %</td><td>4 596 sans aucune anomalie (91,9 %) ; 4 908 exploitables après correction (98,2 %)</td></tr>
+  <tr><td>Anomalies contrôlées</td><td>≥ 5 %</td><td><b>404 enregistrements (8,1 %)</b> : 92 rejetés + 312 corrigés</td></tr>
+  <tr><td>Catégories d'anomalies</td><td>≥ 4</td><td><b>7 présentes</b> dans le CSV (+ doublons et erreurs de parsing gérés et testés)</td></tr>
+  <tr><td>Diversité de types</td><td>id, texte, nombre, catégorie, date, booléen</td><td>tous présents</td></tr>
+</table>
+<p>La part conforme <i>avant</i> injection est garantie par construction : seules les lignes modifiées volontairement portent
+des anomalies. Les 91,9 % mesurés après injection sont cohérents avec 8,1 % d'anomalies injectées.</p>
+
+<h2>2.3 Dictionnaire des données</h2>
+<table>
+  <tr><th>Champ</th><th>Type logique</th><th>Exemple</th><th>Domaine valide</th></tr>
+  <tr><td><code>record_id</code></td><td>identifiant</td><td>ED000001</td><td>unique, obligatoire</td></tr>
+  <tr><td><code>patient_id</code></td><td>identifiant</td><td>SYN-P000027</td><td>un patient peut avoir plusieurs passages</td></tr>
+  <tr><td><code>stay_id</code></td><td>clé métier</td><td>SYN-S0100001</td><td>unique, obligatoire</td></tr>
+  <tr><td><code>arrival_datetime</code></td><td>date</td><td>2025-01-20 10:14:00</td><td><code>yyyy-MM-dd HH:mm:ss</code>, passée, obligatoire</td></tr>
+  <tr><td><code>departure_datetime</code></td><td>date</td><td>2025-01-20 13:05:00</td><td>≥ arrivée</td></tr>
+  <tr><td><code>length_of_stay_hours</code></td><td>décimal</td><td>2.85</td><td>= départ − arrivée (h)</td></tr>
+  <tr><td><code>gender</code></td><td>catégorie</td><td>F</td><td>F, M, OTHER, UNKNOWN</td></tr>
+  <tr><td><code>age_years</code></td><td>entier</td><td>24</td><td>0 - 120</td></tr>
+  <tr><td><code>race_ethnicity</code></td><td>catégorie</td><td>WHITE</td><td>8 modalités</td></tr>
+  <tr><td><code>arrival_transport</code></td><td>catégorie</td><td>AMBULANCE</td><td>WALK IN, AMBULANCE, HELICOPTER, POLICE, OTHER, UNKNOWN</td></tr>
+  <tr><td><code>triage_acuity_esi</code></td><td>ordinal</td><td>2</td><td>1 - 5</td></tr>
+  <tr><td><code>chief_complaint</code></td><td>texte libre</td><td>Wheezing, cough</td><td>motif de consultation</td></tr>
+  <tr><td><code>temperature_f</code></td><td>décimal</td><td>97.7</td><td>90 - 110 °F</td></tr>
+  <tr><td><code>heart_rate_bpm</code> / <code>resp_rate_bpm</code></td><td>entiers</td><td>80 / 13</td><td>20 - 250 / 4 - 60</td></tr>
+  <tr><td><code>spo2_pct</code></td><td>entier</td><td>95</td><td>50 - 100</td></tr>
+  <tr><td><code>systolic_bp_mmhg</code> / <code>diastolic_bp_mmhg</code></td><td>entiers</td><td>128 / 68</td><td>50 - 260 / 20 - 160</td></tr>
+  <tr><td><code>pain_score_0_10</code></td><td>entier</td><td>6</td><td>0 - 10</td></tr>
+  <tr><td><code>primary_diagnosis_icd10</code></td><td>code</td><td>R51.9</td><td>format ICD-10-CM</td></tr>
+  <tr><td><code>primary_diagnosis_title</code></td><td>texte</td><td>Headache, unspecified</td><td>libellé ICD-10</td></tr>
+  <tr><td><code>medication_reconciliation_count</code></td><td>entier</td><td>6</td><td>0 - 60</td></tr>
+  <tr><td><code>disposition</code></td><td>catégorie</td><td>HOME</td><td>HOME, ADMITTED, TRANSFER, LWBS, LAMA, ELOPED, EXPIRED, OTHER</td></tr>
+  <tr><td><code>admitted_flag</code></td><td>booléen</td><td>false</td><td>doit valoir <code>disposition == ADMITTED</code></td></tr>
+</table>
+<p>Le dictionnaire complet, avec les champs dérivés, est livré dans <code>2_dictionnaire_et_generation/data_dictionary.md</code>.</p>
+
+<h2>2.4 Anomalies volontairement introduites</h2>
+<table>
+  <tr><th>Catégorie</th><th>Anomalie injectée</th><th class="n">Lignes</th></tr>
+  <tr><td rowspan="2">Champs manquants</td><td><code>stay_id</code> (8), <code>arrival_datetime</code> (11) : champs critiques</td><td class="n">19</td></tr>
+  <tr><td>départ, patient, sexe, âge, transport, ESI, motif, FC, SpO2, ICD-10, disposition, flag</td><td class="n">5 à 13 / champ</td></tr>
+  <tr><td rowspan="3">Dates invalides</td><td>dates impossibles : 2025-02-30, 2025-13-01, 2026-04-31</td><td class="n">21</td></tr>
+  <tr><td>dates futures (2031-06-15)</td><td class="n">25</td></tr>
+  <tr><td>format non standard <code>dd/MM/yyyy HH:mm</code></td><td class="n">27</td></tr>
+  <tr><td>Valeurs numériques incorrectes</td><td>âge −4/245, T° −98.6/0/9.86/986, FC −72/0/900, SpO2 150/−5/0, PAS 940/12, douleur −3/11</td><td class="n">85</td></tr>
+  <tr><td>Catégories inconnues</td><td>Q, X-NOT-SPECIFIED, TELEPORT, DRONE, MARTIAN, PENDING_REVIEW, SENT_TO_MARS, ESI 0/9</td><td class="n">60</td></tr>
+  <tr><td rowspan="2">Incohérences métier</td><td>départ antérieur à l'arrivée</td><td class="n">27</td></tr>
+  <tr><td><code>admitted_flag</code> contredit la disposition ; LOS déclarée ≠ dates</td><td class="n">24 ; 38</td></tr>
+  <tr><td>Valeurs aberrantes</td><td>durée de séjour &gt; 72 h (jusqu'à 120 h)</td><td class="n">12</td></tr>
+</table>
+<div class="box"><b>Anomalies générées et erreurs d'ingestion.</b> Les anomalies <i>générées</i> font partie du jeu de données. Elles sont
+détectées par les règles métier et apparaissent dans <code>dq.issues</code> / <code>reject_reasons</code>. Les <i>erreurs d'ingestion</i>
+sont techniques (document refusé par Elasticsearch, mapping, réseau). Elles sont captées par la dead letter queue dans
+<code>ed-rejects-dlq</code>. Lors de nos exécutions : <b>0 erreur d'ingestion</b>.</div>
+
+<!-- ============================== 3. MAPPING ============================== -->
+<h1>3. Modèle de données et mapping Elasticsearch</h1>
+<h2>3.1 Index et convention de nommage</h2>
+<table>
+  <tr><th>Index</th><th>Contenu</th><th>Template</th></tr>
+  <tr><td><code>ed-visits-main</code></td><td>passages valides et corrigés (jeu principal)</td><td><code>ed-visits</code> (<code>ed-visits-*</code>, <code>dynamic: strict</code>)</td></tr>
+  <tr><td><code>ed-visits-test</code></td><td>passages du jeu de tests d'anomalies</td><td><code>ed-visits</code></td></tr>
+  <tr><td><code>ed-rejects-main</code> / <code>-test</code></td><td>événements rejetés, conservés pour audit</td><td><code>ed-rejects</code> (<code>ed-rejects-*</code>)</td></tr>
+  <tr><td><code>ed-rejects-dlq</code></td><td>événements refusés par Elasticsearch (DLQ)</td><td><code>ed-rejects</code></td></tr>
+</table>
+<p>La convention est <code>&lt;domaine&gt;-&lt;type&gt;-&lt;run&gt;</code>. Le mapping est porté par des <b>index templates</b> installés avant
+l'ingestion, si bien que tout nouvel index (nouveau lot, rejeu) reçoit exactement le même modèle.</p>
+<ul>
+  <li><code>1 shard + 1 réplique</code> : la réplique est placée sur le second nœud, le cluster est <i>green</i> et tolère la perte d'un nœud en lecture.</li>
+  <li><code>refresh_interval: 5s</code> : suffisant pour une ingestion par lots.</li>
+  <li><code>date_detection: false</code> : aucun typage automatique des chaînes. Le recours au typage automatique est nul.</li>
+</ul>
+
+<h2>3.2 Justification des types</h2>
+<table>
+  <tr><th>Champs</th><th>Type</th><th>Justification</th></tr>
+  <tr><td>identifiants, code ICD-10, chapitre ICD</td><td><code>keyword</code></td><td>correspondance exacte, filtres, agrégations ; une analyse textuelle découperait les codes</td></tr>
+  <tr><td>sexe, origine, transport, disposition, tranche d'âge, jour, mois</td><td><code>keyword</code></td><td>catégories fermées normalisées en majuscules : <i>terms aggregations</i>, filtres</td></tr>
+  <tr><td><code>chief_complaint</code>, <code>primary_diagnosis_title</code></td><td><code>text</code> (analyseur <code>english</code>) + <code>.keyword</code></td><td>recherche plein texte avec racinisation (« pain » → « Chest pain », « Abd pain ») <b>et</b> agrégation sur la valeur exacte</td></tr>
+  <tr><td>dates d'arrivée / départ, <code>@timestamp</code></td><td><code>date</code></td><td>range queries, <code>date_histogram</code>, axe temporel Kibana</td></tr>
+  <tr><td>âge, FC, FR, SpO2, PAS, PAD, nb médicaments</td><td><code>short</code></td><td>entiers bornés : 2 octets au lieu de 8, tri et statistiques</td></tr>
+  <tr><td>ESI, douleur, heure d'arrivée, nb d'anomalies</td><td><code>byte</code></td><td>petites échelles entières</td></tr>
+  <tr><td>température</td><td><code>half_float</code></td><td>1 décimale suffit, 2 octets</td></tr>
+  <tr><td>LOS déclarée et calculée, shock index</td><td><code>float</code></td><td>décimaux pour moyennes et percentiles</td></tr>
+  <tr><td><code>admitted_flag</code>, <code>is_high_acuity</code>, <code>fever_flag</code></td><td><code>boolean</code></td><td>filtres binaires, taux</td></tr>
+  <tr><td><code>dq.issues</code>, <code>dq.anomaly_categories</code></td><td><code>keyword</code> (tableaux)</td><td>comptage des anomalies par type</td></tr>
+</table>
+<p><b>Recherche textuelle ou filtres/agrégations :</b> seuls le motif et le libellé du diagnostic sont destinés à la recherche textuelle.
+Tous les autres champs servent aux filtres, aux tris et aux agrégations.</p>
+
+<h2>3.3 Champs absents, invalides ou inattendus</h2>
+<table>
+  <tr><th>Situation</th><th>Stratégie</th></tr>
+  <tr><td>Champ absent</td><td>cellule vide → champ <b>absent</b> du document, sans valeur sentinelle trompeuse, et issue <code>missing:&lt;champ&gt;</code>. Retrouvable par <i>does not exist</i> dans Kibana.</td></tr>
+  <tr><td>Valeur invalide</td><td>corrigée ou retirée <b>par Logstash avant l'indexation</b> : hors plage → champ retiré, catégorie inconnue → <code>UNKNOWN</code>. La valeur d'origine est conservée dans l'issue (<code>out_of_range:heart_rate_bpm=900</code>). Pas d'<code>ignore_malformed</code>, pour qu'aucune erreur de type ne passe inaperçue.</td></tr>
+  <tr><td>Champ inattendu</td><td>filtre <code>prune</code> (liste blanche), puis <code>dynamic: strict</code>. Un champ qui passerait quand même fait refuser le document, qui part en DLQ puis dans <code>ed-rejects-dlq</code>.</td></tr>
+  <tr><td>Enregistrement rejeté</td><td>index <code>ed-rejects-*</code> (<code>dynamic: false</code>) : champs d'audit indexés, ligne brute (<code>raw_line</code>), valeurs d'origine sous <code>original.*</code> (keyword).</td></tr>
+</table>
+
+<h2>3.4 Preuve d'application du mapping</h2>
+<p><code>scripts/validate.py</code> compare automatiquement le mapping réellement appliqué (<code>GET ed-visits-main/_mapping</code>)
+au fichier du template : <b>42 champs attendus, 42 appliqués, 0 écart, 0 champ inattendu</b>. Le mapping appliqué est livré
+dans <code>3_mapping_elasticsearch/mapping_applique_ed-visits-main.json</code>.</p>
+<div class="two">
+  <figure><img src="../6_captures/11_mapping_check.png"><figcaption>Fig. 1 - Types réellement appliqués dans ed-visits-main</figcaption></figure>
+  <figure><img src="../6_captures/04_index_template.png"><figcaption>Fig. 2 - Template installé et réglages de l'index</figcaption></figure>
+</div>
+<figure class="mid"><img src="../6_captures/18_kibana_data_view_fields.png"><figcaption>Fig. 3 - Data view Kibana « ED visits » : types des champs</figcaption></figure>
+
+<!-- ============================== 4. LOGSTASH ============================== -->
+<h1>4. Installation et configuration de Logstash</h1>
+<h2>4.1 Place dans l'architecture</h2>
+<p>Logstash est ajouté à l'infrastructure du TP3, entièrement décrite en Docker Compose, comme une machine
+<b>LOGSTASH-01</b> (conteneur <code>logstash</code>, IP fixe 172.28.0.14 sur le réseau <code>bigdata-net</code>). Il écrit
+dans les <b>deux nœuds</b> Elasticsearch (es01 172.28.0.11, es02 172.28.0.12). Kibana (ELK-01) et Spark (SPARK-01) lisent les mêmes index.</p>
+<pre>CSV ──file──► LOGSTASH-01 ──HTTP bulk 9200──► es01 ◄──9300──► es02   (cluster ed-analytics-cluster, green)
+                  │                              ▲
+   rejets ──► fichier ndjson                     ├── Kibana (ELK-01) :5601
+                                                 └── Spark (SPARK-01) via connecteur elasticsearch-spark</pre>
+<table>
+  <tr><th>Élément</th><th>Choix</th><th>Justification</th></tr>
+  <tr><td>Version</td><td><code>logstash:8.17.4</code></td><td>identique à Elasticsearch et Kibana</td></tr>
+  <tr><td>Mémoire</td><td>heap 256-512 Mo, conteneur limité à 1 Go</td><td>suffisant pour 5 000 événements, la machine hôte a 16 Go</td></tr>
+  <tr><td>Démarrage</td><td><code>depends_on: setup (completed)</code></td><td>Logstash n'écrit qu'une fois le cluster green et les templates installés</td></tr>
+  <tr><td>Pipelines</td><td><code>ed-visits</code> (2 workers, lots de 250) et <code>ed-dlq</code></td><td>ingestion, puis retraitement des refus</td></tr>
+  <tr><td>Observabilité</td><td>API :9600, un <code>id</code> sur chaque plugin</td><td>compteurs d'événements par étape</td></tr>
+  <tr><td>Résilience</td><td>Dead Letter Queue activée</td><td>aucun refus d'Elasticsearch n'est perdu</td></tr>
+</table>
+<h2>4.2 Fichiers de configuration (livrés dans <code>4_configuration_logstash/</code>)</h2>
+<table>
+  <tr><th>Fichier</th><th>Rôle</th></tr>
+  <tr><td><code>config/logstash.yml</code></td><td>API sur 0.0.0.0:9600, <code>pipeline.ecs_compatibility: disabled</code>, DLQ activée</td></tr>
+  <tr><td><code>config/pipelines.yml</code></td><td>déclaration des deux pipelines</td></tr>
+  <tr><td><code>pipeline/ed-visits.conf</code></td><td>pipeline principal Input / Filter / Output, commenté et <b>paramétré</b> par variables d'environnement</td></tr>
+  <tr><td><code>pipeline/ed-dlq.conf</code></td><td>lecture de la DLQ vers <code>ed-rejects-dlq</code></td></tr>
+  <tr><td><code>scripts/ed_quality.rb</code></td><td>règles de qualité + 7 tests unitaires exécutés au chargement du pipeline</td></tr>
+</table>
+<p>Le pipeline est réutilisable sans modification grâce à trois variables : <code>INPUT_FILE</code> (fichier lu), <code>RUN_ID</code>
+(suffixe des index : <code>main</code>, <code>test</code>…) et <code>EXIT_AFTER_READ</code> (mode service ou mode batch).</p>
+<figure><img src="../6_captures/05_logstash_startup.png"><figcaption>Fig. 4 - Démarrage de Logstash : 2 pipelines en cours d'exécution</figcaption></figure>
+<figure><img src="../6_captures/01_docker_compose_ps.png"><figcaption>Fig. 5 - État des conteneurs de la plateforme</figcaption></figure>
+
+<!-- ============================== 5. PIPELINE ============================== -->
+<h1>5. Transformation, contrôle qualité et ingestion</h1>
+<h2>5.1 Étapes du pipeline <code>ed-visits</code></h2>
+<table>
+  <tr><th>#</th><th>Plugin (id)</th><th>Rôle</th></tr>
+  <tr><td>In</td><td><code>file</code> (in_csv_file)</td><td>lecture complète du fichier (mode <code>read</code>) ; relecture à chaque démarrage, sans risque grâce aux identifiants déterministes</td></tr>
+  <tr><td>0</td><td><code>mutate</code> (f_provenance)</td><td>copie de la ligne brute, fichier source, <code>ingest.run_id</code></td></tr>
+  <tr><td>1</td><td><code>csv</code> (f_csv_parse)</td><td>24 colonnes explicites, en-tête ignoré, cellule vide → champ absent</td></tr>
+  <tr><td>2</td><td><code>ruby</code> (f_snapshot_original)</td><td>copie des valeurs d'origine, conservée avec les rejets</td></tr>
+  <tr><td>3</td><td><code>mutate</code> (f_normalize_case)</td><td>normalisation de la casse et des espaces</td></tr>
+  <tr><td>4</td><td><code>translate</code> ×4 (f_dict_*)</td><td>référentiels des valeurs autorisées et synonymes (<code>MALE</code>→<code>M</code>, <code>WALK-IN</code>→<code>WALK IN</code>)</td></tr>
+  <tr><td>5</td><td><code>date</code> ×2</td><td>format canonique + variante <code>dd/MM/yyyy HH:mm</code>, UTC ; une date impossible fait échouer le parsing (Joda strict)</td></tr>
+  <tr><td>6</td><td><code>ruby</code> (f_quality_rules)</td><td>conversion des types, plages plausibles, dates futures, cohérences, doublons, champs dérivés, statut qualité et routage</td></tr>
+  <tr><td>7</td><td><code>fingerprint</code></td><td><code>_id</code> = SHA-256(<code>stay_id</code>) : rejeu idempotent</td></tr>
+  <tr><td>8</td><td><code>prune</code> (f_prune_unexpected)</td><td>liste blanche des champs du mapping</td></tr>
+  <tr><td>Out</td><td><code>elasticsearch</code> ×2 + <code>file</code></td><td>valides → <code>ed-visits-main</code> ; rejets → <code>ed-rejects-main</code> + <code>rejected-main.ndjson</code></td></tr>
+</table>
+<pre># extrait de ed-visits.conf : dates (format canonique + variante documentée)
+date {
+  id             => "f_date_arrival"
+  match          => [ "arrival_datetime", "yyyy-MM-dd HH:mm:ss", "dd/MM/yyyy HH:mm" ]
+  target         => "arrival_datetime"
+  timezone       => "UTC"
+  tag_on_failure => [ "_arrival_date_invalid" ]
+}
+# routage final
+output {
+  if [@metadata][route] == "valid" {
+    elasticsearch { id => "out_es_valid"  hosts => ["http://es01:9200","http://es02:9200"]
+                    index => "ed-visits-${RUN_ID:main}"  document_id => "%{[@metadata][doc_id]}" }
+  } else {
+    elasticsearch { id => "out_es_rejected"  index => "ed-rejects-${RUN_ID:main}" ... }
+    file          { id => "out_file_rejected" path => "/usr/share/logstash/output/rejected-${RUN_ID:main}.ndjson" }
+  }
+}</pre>
+
+<h2>5.2 Politique de gravité</h2>
+<table>
+  <tr><th>Statut</th><th>Règle</th><th>Destination</th></tr>
+  <tr><td><b>valid</b></td><td>aucune anomalie</td><td><code>ed-visits-main</code></td></tr>
+  <tr><td><b>warning</b></td><td>anomalie non bloquante : la valeur fautive est retirée ou corrigée, l'anomalie est tracée</td><td><code>ed-visits-main</code></td></tr>
+  <tr><td><b>rejected</b></td><td>pas d'identité de séjour ou pas d'ancrage temporel fiable : <code>stay_id</code>/arrivée absents, arrivée impossible ou future, départ &lt; arrivée, doublon</td><td><code>ed-rejects-main</code> + fichier</td></tr>
+  <tr><td><i>DLQ</i></td><td>refus technique d'Elasticsearch (400/404)</td><td><code>ed-rejects-dlq</code></td></tr>
+</table>
+<p><b>Raisonnement :</b> un passage sans date d'arrivée fiable fausserait toutes les analyses temporelles, et un passage sans <code>stay_id</code>
+ne peut pas être dédoublonné. Ces passages sont donc rejetés. À l'inverse, un âge erroné n'invalide ni le diagnostic ni la durée de
+séjour : on retire la seule valeur fausse et on garde l'enregistrement.</p>
+
+<h2>5.3 Traitement par catégorie d'anomalie</h2>
+<table>
+  <tr><th>Catégorie</th><th>Détection</th><th>Traitement</th><th>Statut</th></tr>
+  <tr><td>Champ manquant critique</td><td>règle Ruby sur <code>record_id</code>, <code>stay_id</code>, <code>arrival_datetime</code></td><td>rejet <code>missing:&lt;champ&gt;</code></td><td>rejected</td></tr>
+  <tr><td>Champ manquant non critique</td><td>idem, autres champs</td><td>champ absent + issue</td><td>warning</td></tr>
+  <tr><td>Date impossible</td><td>échec du filtre <code>date</code></td><td>rejet si arrivée ; champ retiré si départ</td><td>rejected / warning</td></tr>
+  <tr><td>Date future</td><td>date &gt; instant d'ingestion</td><td>rejet si arrivée ; champ retiré si départ</td><td>rejected / warning</td></tr>
+  <tr><td>Format de date variant</td><td>2<sup>e</sup> pattern du filtre <code>date</code></td><td>normalisée en ISO-8601 + issue <code>date_format_normalized</code></td><td>warning</td></tr>
+  <tr><td>Valeur numérique incorrecte</td><td>conversion + bornes cliniques</td><td>champ retiré, valeur d'origine dans l'issue</td><td>warning</td></tr>
+  <tr><td>Catégorie inconnue</td><td><code>translate</code> (liste blanche) ; ESI hors 1-5 ; code ICD-10 mal formé</td><td>→ <code>UNKNOWN</code> (ESI et ICD retirés)</td><td>warning</td></tr>
+  <tr><td>Incohérence départ &lt; arrivée</td><td>comparaison des dates</td><td>rejet</td><td>rejected</td></tr>
+  <tr><td>Incohérence flag / disposition</td><td><code>admitted_flag ≠ (disposition == ADMITTED)</code></td><td>flag recalculé depuis la disposition</td><td>warning</td></tr>
+  <tr><td>Incohérence LOS</td><td>|LOS déclarée − LOS calculée| &gt; 0,1 h</td><td>LOS remplacée par la valeur calculée</td><td>warning</td></tr>
+  <tr><td>Valeur aberrante</td><td>LOS &gt; 72 h</td><td>conservée (séjour prolongé possible) mais signalée</td><td>warning</td></tr>
+  <tr><td>Doublon</td><td>ensemble partagé des <code>stay_id</code> vus dans le run</td><td>1<sup>re</sup> occurrence indexée, suivantes rejetées</td><td>rejected</td></tr>
+  <tr><td>Ligne CSV mal formée</td><td>tag <code>_csvparsefailure</code></td><td>rejet</td><td>rejected</td></tr>
+</table>
+<h3>Doublons : double protection</h3>
+<ul>
+  <li><b>Dans un run :</b> un ensemble des <code>stay_id</code> déjà vus, partagé et protégé par un verrou entre les workers. Le doublon est rejeté et donc <b>compté</b>.
+      L'action <code>create</code> d'Elasticsearch a été écartée : elle renverrait une erreur 409, que la DLQ ne capte pas.</li>
+  <li><b>Entre runs :</b> <code>_id = SHA-256(stay_id)</code>. Relancer l'ingestion met à jour les mêmes documents au lieu de les dupliquer.</li>
+</ul>
+<h3>Champs dérivés</h3>
+<p><code>@timestamp</code> (= arrivée), <code>los_computed_hours</code>, <code>age_group</code>, <code>arrival_hour</code>, <code>arrival_dow</code>,
+<code>arrival_month</code>, <code>is_high_acuity</code> (ESI ≤ 2), <code>fever_flag</code> (≥ 100,4 °F), <code>shock_index</code> (FC/PAS),
+<code>icd10_chapter</code>, et le bloc qualité <code>dq.*</code> (statut, liste et catégories d'anomalies).</p>
+<figure class="mid"><img src="../6_captures/10_warning_document.png"><figcaption>Fig. 6 - Document indexé en <i>warning</i> : FC=900 retirée, anomalie tracée dans dq.issues</figcaption></figure>
+
+<!-- ============================== 6. VERIFICATION ============================== -->
+<h1>6. Vérification dans Elasticsearch et Kibana</h1>
+<h2>6.1 Bilan chiffré de l'ingestion</h2>
+<div class="kpis">
+  <div class="kpi"><b>5 000</b><span>enregistrements générés</span></div>
+  <div class="kpi"><b>5 001</b><span>lignes lues (en-tête inclus)</span></div>
+  <div class="kpi"><b>4 908</b><span>indexés</span></div>
+  <div class="kpi"><b>92</b><span>rejetés</span></div>
+  <div class="kpi"><b>0</b><span>doublons</span></div>
+  <div class="kpi"><b>0</b><span>DLQ</span></div>
+</div>
+<table>
+  <tr><th>Mesure</th><th class="n">Valeur</th><th>Source de la mesure</th></tr>
+  <tr><td>Enregistrements générés (lignes CSV hors en-tête)</td><td class="n">5 000</td><td>comptage du fichier</td></tr>
+  <tr><td>Lignes lues par Logstash</td><td class="n">5 001</td><td>plugin <code>in_csv_file</code>, events.out</td></tr>
+  <tr><td>Événements traités (en-tête supprimé par le filtre csv)</td><td class="n">5 000</td><td>pipeline, events.out</td></tr>
+  <tr><td><b>Indexés</b> dans <code>ed-visits-main</code></td><td class="n"><b>4 908</b></td><td><code>_count</code> = <code>out_es_valid</code></td></tr>
+  <tr><td>· dont <code>valid</code></td><td class="n">4 596</td><td><code>dq.status</code></td></tr>
+  <tr><td>· dont <code>warning</code> (corrigés, tracés)</td><td class="n">312</td><td><code>dq.status</code></td></tr>
+  <tr><td><b>Rejetés</b> dans <code>ed-rejects-main</code></td><td class="n"><b>92</b></td><td><code>_count</code> = <code>out_es_rejected</code> = lignes du fichier ndjson</td></tr>
+  <tr><td>Doublons détectés</td><td class="n">0</td><td>catégorie <code>duplicate</code> (2/2 détectés sur le jeu de tests)</td></tr>
+  <tr><td>Erreurs d'ingestion (DLQ)</td><td class="n">0</td><td><code>_count ed-rejects-dlq</code></td></tr>
+  <tr class="total"><td>Bilan indexés + rejetés + DLQ</td><td class="n">5 000</td><td>= générés : <b>aucune perte</b></td></tr>
+</table>
+<div class="box"><b>Explication des écarts.</b>
+<ul>
+  <li><b>Lignes lues − générés = 1 :</b> la ligne d'en-tête est lue par l'input puis supprimée par le filtre <code>csv</code> (<code>skip_header</code>). Le plugin <code>f_csv_parse</code> reçoit 5 001 événements et en émet 5 000.</li>
+  <li><b>Générés − indexés = 92 :</b> rejets volontaires, tous comptés et justifiés (tableau 6.2), soit 25 dates futures + 27 départs antérieurs à l'arrivée + 21 dates impossibles + 11 arrivées manquantes + 8 <code>stay_id</code> manquants. Ce chiffre correspond exactement au profilage préalable du CSV.</li>
+  <li><b>Doublons = 0 :</b> le jeu principal n'en contient pas (vérifié par profilage). Le mécanisme est démontré par le jeu de tests.</li>
+</ul></div>
+
+<h2>6.2 Rejets et anomalies par catégorie</h2>
+<div class="two">
+<table>
+  <tr><th>Motif de rejet</th><th class="n">Év.</th></tr>
+  <tr><td><code>departure_before_arrival</code></td><td class="n">27</td></tr>
+  <tr><td><code>future_date</code> (2031-06-15)</td><td class="n">25</td></tr>
+  <tr><td><code>missing:arrival_datetime</code></td><td class="n">11</td></tr>
+  <tr><td><code>invalid_date</code> 2025-02-30</td><td class="n">8</td></tr>
+  <tr><td><code>invalid_date</code> 2025-13-01</td><td class="n">8</td></tr>
+  <tr><td><code>missing:stay_id</code></td><td class="n">8</td></tr>
+  <tr><td><code>invalid_date</code> 2026-04-31</td><td class="n">5</td></tr>
+  <tr class="total"><td>Total</td><td class="n">92</td></tr>
+</table>
+<table>
+  <tr><th>Catégorie</th><th class="n">Indexés (warning)</th><th class="n">Rejetés</th></tr>
+  <tr><td><code>missing_field</code></td><td class="n">101</td><td class="n">19</td></tr>
+  <tr><td><code>invalid_numeric</code></td><td class="n">85</td><td class="n">0</td></tr>
+  <tr><td><code>unknown_category</code></td><td class="n">60</td><td class="n">0</td></tr>
+  <tr><td><code>inconsistency</code></td><td class="n">30</td><td class="n">27</td></tr>
+  <tr><td><code>format_variant</code></td><td class="n">27</td><td class="n">0</td></tr>
+  <tr><td><code>outlier</code></td><td class="n">11</td><td class="n">1</td></tr>
+  <tr><td><code>invalid_date</code></td><td class="n">0</td><td class="n">46</td></tr>
+</table>
+</div>
+<p>Un enregistrement peut cumuler plusieurs anomalies : 2 enregistrements indexés et 26 rejetés en portent au moins deux. Par exemple,
+les 25 passages datés de 2031 ont une arrivée <i>et</i> un départ futurs. Parmi les 24 incohérences flag/disposition du CSV,
+17 sont corrigées dans l'index. Les autres concernent des lignes rejetées, ou des dispositions inconnues pour lesquelles le flag ne peut
+pas être recalculé. De même, 13 incohérences de LOS sont corrigées sur les 38 du profilage ; les autres portent sur des lignes rejetées.</p>
+<figure><img src="../6_captures/07_validation_main.png"><figcaption>Fig. 7 - Sortie de scripts/validate.py (bilan, motifs, catégories, conformité du mapping)</figcaption></figure>
+
+<h2>6.3 Tests des catégories d'anomalies</h2>
+<p>Un jeu de 20 lignes (<code>ed_anomaly_samples.csv</code>) couvre chaque cas, dont 2 doublons. Il passe dans <b>le même pipeline</b>
+(service <code>logstash-test</code>, <code>RUN_ID=test</code>, mode batch) :</p>
+<table>
+  <tr><th>Ligne(s)</th><th>Cas testé</th><th>Attendu</th><th>Obtenu</th></tr>
+  <tr><td>T001, T002</td><td>enregistrements conformes</td><td>valid</td><td>✔ valid</td></tr>
+  <tr><td>T004 ; T005</td><td><code>stay_id</code> manquant ; arrivée manquante</td><td>rejected</td><td>✔ rejected</td></tr>
+  <tr><td>T006, T007</td><td>30 février ; mois 13</td><td>rejected <code>invalid_date</code></td><td>✔</td></tr>
+  <tr><td>T008</td><td>date future 2031</td><td>rejected <code>future_date</code></td><td>✔</td></tr>
+  <tr><td>T009</td><td>départ &lt; arrivée</td><td>rejected</td><td>✔</td></tr>
+  <tr><td>T003, T011</td><td>patient manquant ; départ manquant</td><td>warning <code>missing</code></td><td>✔</td></tr>
+  <tr><td>T010</td><td>date <code>dd/MM/yyyy</code></td><td>warning, date normalisée</td><td>✔</td></tr>
+  <tr><td>T012 ; T020</td><td>6 constantes hors plage ; T° non numérique</td><td>warning, champs retirés</td><td>✔</td></tr>
+  <tr><td>T013 ; T017</td><td>5 catégories inconnues ; code ICD-10 invalide</td><td>warning, <code>UNKNOWN</code></td><td>✔</td></tr>
+  <tr><td>T014, T015</td><td>flag incohérent ; LOS 9,75 h déclarée vs 2 h réelles</td><td>warning, valeurs corrigées</td><td>✔</td></tr>
+  <tr><td>T016</td><td>LOS 120 h</td><td>warning <code>outlier</code></td><td>✔</td></tr>
+  <tr><td>T018 + ligne 20</td><td><code>stay_id</code> déjà vu ; copie exacte de T001</td><td>2 rejets <code>duplicate</code></td><td>✔ 2 doublons</td></tr>
+  <tr class="total"><td colspan="2">Résultat</td><td>12 indexés / 8 rejetés</td><td>12 (2 valid + 10 warning) / 8 - bilan 20 ✔</td></tr>
+</table>
+<p>Le script de règles contient en plus <b>7 tests unitaires</b> (blocs <code>test</code> du filtre <code>ruby</code>), exécutés à chaque
+chargement du pipeline. Si l'un d'eux échoue, le pipeline refuse de démarrer.</p>
+<figure class="mid"><img src="../6_captures/08_validation_test.png"><figcaption>Fig. 8 - Résultats du jeu de tests (doublons, motifs, catégories)</figcaption></figure>
+
+<h2>6.4 Index et compteurs</h2>
+<figure><img src="../6_captures/03_indices.png"><figcaption>Fig. 9 - Index et répartition des shards : primaire et réplique sur deux nœuds différents</figcaption></figure>
+<figure><img src="../6_captures/06_logstash_pipeline_stats.png"><figcaption>Fig. 10 - Compteurs Logstash par plugin (API :9600)</figcaption></figure>
+<figure><img src="../6_captures/02_cluster_nodes_health.png"><figcaption>Fig. 11 - Cluster ed-analytics-cluster : 2 nœuds, statut green</figcaption></figure>
+<figure class="mid"><img src="../6_captures/09_rejected_file.png"><figcaption>Fig. 12 - Fichier des rejets (preuve hors Elasticsearch) : ligne brute, motifs, valeurs d'origine</figcaption></figure>
+<figure><img src="../6_captures/17_kibana_index_management.png"><figcaption>Fig. 13 - Kibana Index Management : index ed-*</figcaption></figure>
+
+<h2>6.5 Exploration et visualisations Kibana</h2>
+<p>Deux data views (« ED visits », « ED rejected events ») et deux tableaux de bord Lens sont créés automatiquement
+au démarrage (<code>kibana/ed-dashboards.ndjson</code>, importé par le service <code>setup</code>).</p>
+<figure><img src="../6_captures/12_kibana_discover_visits.png"><figcaption>Fig. 14 - Discover : 4 908 passages du jeu principal</figcaption></figure>
+<figure><img src="../6_captures/13_kibana_discover_warning.png"><figcaption>Fig. 15 - Discover : enregistrements corrigés (dq.status : warning)</figcaption></figure>
+<figure><img src="../6_captures/14_kibana_discover_rejects.png"><figcaption>Fig. 16 - Discover : 92 événements rejetés, avec motifs et valeurs d'origine</figcaption></figure>
+<figure class="tall"><img src="../6_captures/15_kibana_dashboard_activite.png"><figcaption>Fig. 17 - Tableau de bord « Supervision de l'activité des urgences »</figcaption></figure>
+<p><b>Lecture du tableau de bord d'activité :</b></p>
+<ul>
+  <li>environ 60 passages par semaine, stables sur 18 mois ;</li>
+  <li>65 % de retours à domicile et 23 % d'hospitalisations ;</li>
+  <li>la durée de séjour moyenne décroît de 9,7 h (ESI 1) à 6,7 h (ESI 5), signe d'un triage cohérent ;</li>
+  <li>le motif le plus fréquent est la douleur thoracique non spécifiée.</li>
+</ul>
+<figure><img src="../6_captures/16_kibana_dashboard_qualite.png"><figcaption>Fig. 18 - Tableau de bord « Qualité des données et rejets »</figcaption></figure>
+
+<!-- ============================== 7. SPARK ============================== -->
+<h1>7. Préparation du prochain jalon : traitements Spark</h1>
+<p>Les trois traitements portent sur l'index nettoyé <code>ed-visits-main</code>, lu par Spark 3.5.5 via le connecteur
+<code>elasticsearch-spark-30_2.12:8.17.4</code>. Bien que l'implémentation ne soit pas exigée, un prototype fonctionnel a été réalisé
+(<code>9_traitements_spark/jobs/ed_analytics_es.py</code>). Ses résultats confirment que les champs préparés par le pipeline suffisent.</p>
+<table>
+  <tr><th>#</th><th>Type</th><th>Question</th><th>Champs nécessaires</th><th>Résultat attendu / obtenu</th></tr>
+  <tr><td>A1</td><td>statistique / agrégation</td><td>La gravité au triage prédit-elle la durée et l'hospitalisation ?</td>
+      <td><code>triage_acuity_esi</code>, <code>length_of_stay_hours</code>, <code>admitted_flag</code>, <code>shock_index</code></td>
+      <td>Table par ESI : volume, LOS moyenne / médiane / P90, % hospitalisés. <b>Obtenu :</b> hospitalisation de 36 % (ESI 1) à 17,5 % (ESI 5), P90 de LOS de 27 h à 15 h.</td></tr>
+  <tr><td>A2</td><td>analyse temporelle</td><td>Quand l'affluence est-elle maximale ? L'activité évolue-t-elle ?</td>
+      <td><code>arrival_hour</code>, <code>arrival_dow</code>, <code>arrival_month</code>, LOS, flag</td>
+      <td>Matrice 7 j × 24 h des arrivées, tendance mensuelle. <b>Obtenu :</b> environ 270 passages/mois, stables ; profil horaire peu marqué (limite du synthétique).</td></tr>
+  <tr><td>A3</td><td>analyse métier</td><td>Quels diagnostics consomment le plus de lits ?</td>
+      <td><code>primary_diagnosis_icd10</code>, titre, flag, LOS, ESI</td>
+      <td>Diagnostics (≥ 50 passages) classés par % d'hospitalisation et % de séjours &gt; 6 h. <b>Obtenu :</b> sepsis 80,6 %, AVC 76,5 %, insuffisance cardiaque 64,7 % ; douleur thoracique 10 %.</td></tr>
+</table>
+<h2>7.1 Limites du jeu de données</h2>
+<ul>
+  <li>Corrélations simplifiées : le shock index varie peu avec la gravité (0,70 à 0,73), et il n'y a pas de rythme circadien ni de saisonnalité réalistes.</li>
+  <li>Volume modeste (5 000 passages), insuffisant pour éprouver la distribution des traitements Spark.</li>
+  <li>Un seul diagnostic par passage, pas d'horaires intermédiaires (triage, médecin), donc pas de calcul des délais d'attente.</li>
+  <li>Absence de doublons dans le lot principal : le mécanisme n'est démontré que sur le jeu de tests.</li>
+  <li>Fuseau horaire inconnu : les dates sont traitées en UTC.</li>
+</ul>
+<h2>7.2 Améliorations prévues (TP suivant)</h2>
+<ul>
+  <li>Générateur paramétré avec une graine fixe pour produire des volumes de 100 000 lignes et plus, en conservant les mêmes taux d'anomalies.</li>
+  <li>Injection de doublons et de profils temporels réalistes (pics de fin de matinée, hiver).</li>
+  <li>Index à plusieurs shards et plusieurs workers Spark, pour une lecture réellement parallèle (1 partition par shard).</li>
+  <li>Écriture des résultats Spark dans Elasticsearch pour les visualiser dans Kibana.</li>
+</ul>
+
+<!-- ============================== 8. DIFFICULTES ============================== -->
+<h1>8. Difficultés rencontrées</h1>
+<table>
+  <tr><th>Problème</th><th>Analyse</th><th>Solution</th><th>Résultat</th></tr>
+  <tr><td>Docker Desktop ne démarre pas (moteur : HTTP 503)</td><td>WSL non installé ; la virtualisation est pourtant active</td><td><code>wsl --install --no-distribution</code>, redémarrage</td><td>moteur Docker opérationnel</td></tr>
+  <tr><td>Pipeline <code>ed-visits</code> non démarré : <code>NameError base_event … TestContext</code></td><td>les blocs <code>test</code> du filtre ruby s'exécutent dans un contexte séparé, qui ne voit pas les méthodes du script</td><td>aides de test converties en lambdas globales</td><td>7 tests passent, 2 pipelines actifs</td></tr>
+  <tr><td>Formats de date hétérogènes et dates impossibles</td><td>un seul pattern rejetterait 27 dates valides ; Joda strict refuse le 30 février</td><td>2 patterns + issue <code>date_format_normalized</code> ; rejet des impossibles</td><td>27 dates récupérées, 21 rejets justifiés</td></tr>
+  <tr><td>Doublons invisibles avec <code>action =&gt; create</code></td><td>l'erreur 409 n'est pas envoyée en DLQ : le doublon disparaîtrait des comptes</td><td>détection en amont (ensemble des <code>stay_id</code>) + <code>_id</code> déterministe</td><td>doublons comptés (2/2), rejeu idempotent</td></tr>
+  <tr><td>Kibana : champs « vides » dans Discover</td><td>plage par défaut de 15 minutes, alors que les données couvrent 2025-2026 ; valeurs des rejets non indexées</td><td>plage par défaut « 2 dernières années » ; <code>original.*</code> indexé en keyword</td><td>données et rejets visibles</td></tr>
+  <tr><td>Mémoire limitée (16 Go pour 6 services)</td><td>JVM et Node dimensionnés par défaut sur la RAM visible</td><td>heaps et <code>mem_limit</code> explicites, ML d'Elasticsearch désactivé</td><td>la stack tient dans environ 6 Go</td></tr>
+</table>
+
+<!-- ============================== 9. CONCLUSION ============================== -->
+<h1>9. Conclusion et reproduction</h1>
+<p>Le jalon 2 est atteint. Le jeu de 5 000 passages respecte toutes les contraintes, et le modèle Elasticsearch est explicite, justifié et
+vérifié automatiquement. Le pipeline Logstash ne se contente pas de lire et d'indexer : il type, normalise, contrôle 9 catégories
+d'anomalies, corrige ce qui peut l'être et isole le reste. Le bilan <b>5 000 = 4 908 + 92 + 0</b> prouve qu'aucun événement n'est perdu.
+Les données nettoyées sont exploitées dans Kibana et déjà lues par Spark, ce qui prépare le jalon suivant.</p>
+<h2>Reproduire l'environnement</h2>
+<pre>docker compose up -d                                   # cluster ES x2, Kibana, setup, Logstash, Spark
+docker compose ps                                      # tous healthy, setup "Exited (0)"
+python scripts/validate.py                             # bilan chiffré -> docs/validation_results.md
+docker compose --profile test run --rm logstash-test   # jeu de tests d'anomalies
+python scripts/validate.py --run test
+docker compose exec spark-master bash -c '/opt/spark/bin/spark-submit --packages $ES_SPARK_CONNECTOR /opt/spark/jobs/ed_analytics_es.py'</pre>
+<h2>Contenu du dossier livré</h2>
+<table>
+  <tr><th>Dossier</th><th>Livrable TP4</th></tr>
+  <tr><td><code>1_jeu_de_donnees/</code></td><td>(1) jeu complet de 5 000 enregistrements + jeu de tests</td></tr>
+  <tr><td><code>2_dictionnaire_et_generation/</code></td><td>(2) dictionnaire des données et documentation de génération</td></tr>
+  <tr><td><code>3_mapping_elasticsearch/</code></td><td>(3) templates, mappings réellement appliqués, justification</td></tr>
+  <tr><td><code>4_configuration_logstash/</code></td><td>(4) pipelines, règles qualité, réglages, docker-compose</td></tr>
+  <tr><td><code>5_rapport/</code></td><td>(5) ce rapport (PDF + source HTML)</td></tr>
+  <tr><td><code>6_captures/</code></td><td>(6) captures authentiques (PNG) + sorties brutes des commandes (<code>preuves_texte/</code>)</td></tr>
+  <tr><td><code>7_bilan_volumes/</code></td><td>(7) tableaux des volumes générés, lus, indexés, rejetés et dupliqués</td></tr>
+  <tr><td><code>8_anomalies/</code></td><td>(8) anomalies testées et traitements</td></tr>
+  <tr><td><code>9_traitements_spark/</code></td><td>(9) trois traitements Spark proposés + prototype et résultats</td></tr>
+</table>
+
+<script>
+// keep every h2/h3 on the same page as the block that follows it
+document.querySelectorAll('h2, h3').forEach(h => {
+  const next = h.nextElementSibling;
+  if (!next || next.tagName === 'H1') return;
+  const wrap = document.createElement('div');
+  wrap.className = 'keep';
+  h.parentNode.insertBefore(wrap, h);
+  wrap.appendChild(h);
+  wrap.appendChild(next);
+});
+</script>
+</body>
+</html>

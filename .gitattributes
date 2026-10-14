@@ -1,0 +1,8 @@
+# Files mounted into Linux containers MUST keep LF line endings, even when the
+# repo is cloned on Windows (core.autocrlf=true would break setup.sh, the
+# Logstash pipelines and the CSV header detection).
+* text=auto eol=lf
+
+*.pdf  binary
+*.png  binary
+*.jpg  binary

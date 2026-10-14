@@ -1,0 +1,21 @@
+record_id,patient_id,stay_id,arrival_datetime,departure_datetime,length_of_stay_hours,gender,age_years,race_ethnicity,arrival_transport,triage_acuity_esi,chief_complaint,temperature_f,heart_rate_bpm,resp_rate_bpm,spo2_pct,systolic_bp_mmhg,diastolic_bp_mmhg,pain_score_0_10,primary_diagnosis_icd10,primary_diagnosis_title,medication_reconciliation_count,disposition,admitted_flag
+T001,TP-001,TS-001,2025-03-01 10:00:00,2025-03-01 13:00:00,3.00,F,40,WHITE,AMBULANCE,2,Chest pain,98.6,80,16,98,120,80,5,R07.9,"Chest pain, unspecified",3,HOME,false
+T002,TP-002,TS-002,2025-03-02 11:00:00,2025-03-02 15:30:00,4.50,M,67,ASIAN,WALK IN,3,"Weakness, polyuria",99.0,98,15,99,116,63,7,E11.65,Type 2 diabetes mellitus with hyperglycemia,9,ADMITTED,true
+T003,,TS-003,2025-03-03 09:00:00,2025-03-03 12:00:00,3.00,F,30,WHITE,WALK IN,4,Headache,98.2,75,14,99,118,76,6,R51.9,"Headache, unspecified",2,HOME,false
+T004,TP-004,,2025-03-04 09:00:00,2025-03-04 12:00:00,3.00,M,52,BLACK/AFRICAN AMERICAN,AMBULANCE,3,Dyspnea,98.4,92,20,94,135,85,4,J18.9,"Pneumonia, unspecified organism",5,ADMITTED,true
+T005,TP-005,TS-005,,2025-03-05 12:00:00,3.00,F,45,WHITE,WALK IN,3,Abd pain,98.6,88,16,98,125,80,6,R10.9,Unspecified abdominal pain,4,HOME,false
+T006,TP-006,TS-006,2025-02-30 10:12:00,2025-03-01 12:00:00,3.00,M,33,OTHER,WALK IN,4,Dysuria,98.6,82,16,99,122,78,3,N39.0,"Urinary tract infection, site not specified",1,HOME,false
+T007,TP-007,TS-007,2025-13-01 14:20:00,2025-13-01 18:00:00,3.67,F,71,WHITE,AMBULANCE,2,Chest tightness,98.0,110,22,92,150,90,7,I21.9,"Acute myocardial infarction, unspecified",8,ADMITTED,true
+T008,TP-008,TS-008,2031-06-15 09:30:00,2031-06-15 13:05:00,3.58,M,58,HISPANIC/LATINO,WALK IN,3,Dizziness,98.5,85,16,98,130,82,2,R42,Dizziness and giddiness,4,HOME,false
+T009,TP-009,TS-009,2025-03-09 18:00:00,2025-03-09 14:00:00,4.00,F,25,ASIAN,WALK IN,5,Leg redness,98.9,78,14,99,115,72,4,L03.90,"Cellulitis, unspecified",0,HOME,false
+T010,TP-010,TS-010,10/03/2025 08:15,2025-03-10 10:15:00,2.00,M,41,WHITE,WALK IN,4,Low back pain,98.3,72,14,99,128,84,6,M54.50,"Low back pain, unspecified",2,HOME,false
+T011,TP-011,TS-011,2025-03-11 07:00:00,,5.00,F,80,WHITE,AMBULANCE,2,Syncope,97.9,58,16,96,100,60,0,R55,Syncope and collapse,10,ADMITTED,true
+T012,TP-012,TS-012,2025-03-12 10:00:00,2025-03-12 12:00:00,2.00,M,-4,WHITE,WALK IN,3,Headache,-98.6,900,16,150,940,80,11,R51.9,"Headache, unspecified",2,HOME,false
+T013,TP-013,TS-013,2025-03-13 10:00:00,2025-03-13 12:00:00,2.00,Q,36,MARTIAN,TELEPORT,9,Anxiety,98.6,90,18,98,124,82,3,F41.9,"Anxiety disorder, unspecified",1,SENT_TO_MARS,true
+T014,TP-014,TS-014,2025-03-14 10:00:00,2025-03-14 12:00:00,2.00,F,29,WHITE,WALK IN,3,Abd pain,98.6,86,16,98,118,74,7,R10.9,Unspecified abdominal pain,1,HOME,true
+T015,TP-015,TS-015,2025-03-15 10:00:00,2025-03-15 12:00:00,9.75,M,62,WHITE,AMBULANCE,2,Chest pain,98.6,96,18,97,145,88,6,R07.9,"Chest pain, unspecified",6,ADMITTED,false
+T016,TP-016,TS-016,2025-03-16 00:00:00,2025-03-21 00:00:00,120.00,F,88,WHITE,AMBULANCE,1,Altered mental status,101.2,118,26,89,92,55,0,A41.9,"Sepsis, unspecified organism",12,ADMITTED,true
+T017,TP-017,TS-017,2025-03-17 10:00:00,2025-03-17 12:00:00,2.00,F,47,WHITE,WALK IN,3,Back pain,98.6,80,16,98,120,80,5,XX-99,Bad code,2,HOME,false
+T018,TP-018,TS-001,2025-03-18 10:00:00,2025-03-18 12:00:00,2.00,M,55,WHITE,WALK IN,3,Chest pain,98.6,80,16,98,120,80,5,R07.9,"Chest pain, unspecified",3,HOME,false
+T001,TP-001,TS-001,2025-03-01 10:00:00,2025-03-01 13:00:00,3.00,F,40,WHITE,AMBULANCE,2,Chest pain,98.6,80,16,98,120,80,5,R07.9,"Chest pain, unspecified",3,HOME,false
+T020,TP-020,TS-020,2025-03-20 10:00:00,2025-03-20 12:00:00,2.00,Other,35,PATIENT DECLINED TO ANSWER,HELICOPTER,1,Trauma,abc,130,28,91,95,60,9,S06.0X0A,Concussion without loss of consciousness,4,TRANSFER,false

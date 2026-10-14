@@ -1,0 +1,22 @@
+# ===================== Elasticsearch - ELK-02 (es02) =====================
+cluster.name: ed-analytics-cluster
+node.name: es02
+node.roles: [ master, data, ingest ]
+
+# --- Network -------------------------------------------------------------
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# --- Discovery -----------------------------------------------------------
+discovery.seed_hosts: [ "es01" ]
+cluster.initial_master_nodes: [ "es01", "es02" ]
+
+# --- System --------------------------------------------------------------
+bootstrap.memory_lock: true
+
+# --- Lab choices (same as es01) ------------------------------------------
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+xpack.ml.enabled: false
+cluster.routing.allocation.disk.threshold_enabled: false

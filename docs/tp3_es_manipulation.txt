@@ -1,0 +1,75 @@
+# =====================================================================
+#  TP3 - Étape 5 : première manipulation Elasticsearch
+#  À coller dans Kibana > Dev Tools (http://localhost:5601/app/dev_tools#/console)
+#  Jeu de données : un petit catalogue des services d'urgences (contexte métier ED)
+# =====================================================================
+
+# 0. Le cluster : 2 nœuds, statut green
+GET _cat/nodes?v&h=name,ip,node.role,master,heap.percent
+GET _cluster/health
+
+# 1. Création de l'index avec une structure explicite
+PUT ed-units-tp3
+{
+  "settings": { "number_of_shards": 1, "number_of_replicas": 1 },
+  "mappings": {
+    "properties": {
+      "unit_code":   { "type": "keyword" },
+      "name":        { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+      "category":    { "type": "keyword" },
+      "beds":        { "type": "short" },
+      "pediatric":   { "type": "boolean" },
+      "opened_on":   { "type": "date" },
+      "description": { "type": "text" }
+    }
+  }
+}
+
+# 2. Insertion de plusieurs documents (API _bulk)
+POST ed-units-tp3/_bulk?refresh=true
+{ "index": { "_id": "U01" } }
+{ "unit_code": "U01", "name": "Resuscitation bay", "category": "CRITICAL", "beds": 4, "pediatric": false, "opened_on": "2019-03-01", "description": "Immediate life-saving care for ESI 1 patients" }
+{ "index": { "_id": "U02" } }
+{ "unit_code": "U02", "name": "Acute care area", "category": "ACUTE", "beds": 18, "pediatric": false, "opened_on": "2019-03-01", "description": "Monitored beds for chest pain, sepsis and stroke patients" }
+{ "index": { "_id": "U03" } }
+{ "unit_code": "U03", "name": "Fast track", "category": "MINOR", "beds": 8, "pediatric": false, "opened_on": "2021-06-15", "description": "Minor injuries and low acuity complaints, ESI 4 and 5" }
+{ "index": { "_id": "U04" } }
+{ "unit_code": "U04", "name": "Pediatric emergency", "category": "ACUTE", "beds": 10, "pediatric": true, "opened_on": "2022-01-10", "description": "Children under 18, fever, asthma and trauma" }
+{ "index": { "_id": "U05" } }
+{ "unit_code": "U05", "name": "Observation unit", "category": "OBSERVATION", "beds": 12, "pediatric": false, "opened_on": "2023-09-01", "description": "Short stay observation up to 24 hours before admission or discharge" }
+
+# 3. Vérification de la présence des documents
+GET ed-units-tp3/_count
+GET ed-units-tp3/_doc/U02
+GET _cat/shards/ed-units-tp3?v
+
+# 4. Recherches
+# 4a. plein texte
+GET ed-units-tp3/_search
+{ "query": { "match": { "description": "chest pain stroke" } } }
+
+# 4b. filtre exact + plage numérique
+GET ed-units-tp3/_search
+{
+  "query": { "bool": {
+    "filter": [ { "term": { "category": "ACUTE" } }, { "range": { "beds": { "gte": 10 } } } ]
+  } }
+}
+
+# 4c. agrégation : nombre de lits par catégorie
+GET ed-units-tp3/_search
+{
+  "size": 0,
+  "aggs": { "by_category": { "terms": { "field": "category" }, "aggs": { "beds": { "sum": { "field": "beds" } } } } }
+}
+
+# 5. Mise à jour puis suppression
+POST ed-units-tp3/_update/U03
+{ "doc": { "beds": 10 } }
+DELETE ed-units-tp3/_doc/U05
+GET ed-units-tp3/_count
+
+# 6. Une fois l'ingestion TP4 faite : interrogation de l'index réel
+GET ed-visits-main/_count
+GET ed-visits-main/_search
+{ "size": 3, "query": { "match": { "chief_complaint": "chest pain" } } }

@@ -1,0 +1,18 @@
+# ========================== Kibana (ELK-01) ==========================
+server.name: kibana-elk-01
+server.host: "0.0.0.0"
+server.port: 5601
+server.publicBaseUrl: "http://localhost:5601"
+
+# Both nodes listed: Kibana keeps working if one node is down
+elasticsearch.hosts: [ "http://es01:9200", "http://es02:9200" ]
+elasticsearch.requestTimeout: 60000
+
+# Stack Monitoring UI reads cluster stats directly from Elasticsearch
+monitoring.ui.container.elasticsearch.enabled: true
+
+telemetry.optIn: false
+telemetry.allowChangingOptInStatus: false
+
+# Lab cluster without security (see docs/architecture.md): hide the banner
+security.showInsecureClusterWarning: false

@@ -1,0 +1,92 @@
+{
+  "index_patterns": ["ed-visits-*"],
+  "priority": 200,
+  "_meta": {
+    "description": "Emergency-department visits (valid + warning records) - explicit mapping, TP4",
+    "version": 1
+  },
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "analysis": {
+        "normalizer": {
+          "lowercase_ascii": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+        }
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "date_detection": false,
+      "properties": {
+        "@timestamp":                      { "type": "date" },
+
+        "record_id":                       { "type": "keyword" },
+        "patient_id":                      { "type": "keyword" },
+        "stay_id":                         { "type": "keyword" },
+
+        "arrival_datetime":                { "type": "date" },
+        "departure_datetime":              { "type": "date" },
+        "length_of_stay_hours":            { "type": "float" },
+
+        "gender":                          { "type": "keyword" },
+        "age_years":                       { "type": "short" },
+        "race_ethnicity":                  { "type": "keyword" },
+        "arrival_transport":               { "type": "keyword" },
+        "triage_acuity_esi":               { "type": "byte" },
+
+        "chief_complaint": {
+          "type": "text",
+          "analyzer": "english",
+          "fields": { "keyword": { "type": "keyword", "ignore_above": 256, "normalizer": "lowercase_ascii" } }
+        },
+
+        "temperature_f":                   { "type": "half_float" },
+        "heart_rate_bpm":                  { "type": "short" },
+        "resp_rate_bpm":                   { "type": "short" },
+        "spo2_pct":                        { "type": "short" },
+        "systolic_bp_mmhg":                { "type": "short" },
+        "diastolic_bp_mmhg":               { "type": "short" },
+        "pain_score_0_10":                 { "type": "byte" },
+
+        "primary_diagnosis_icd10":         { "type": "keyword" },
+        "primary_diagnosis_title": {
+          "type": "text",
+          "analyzer": "english",
+          "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
+        },
+        "medication_reconciliation_count": { "type": "short" },
+        "disposition":                     { "type": "keyword" },
+        "admitted_flag":                   { "type": "boolean" },
+
+        "icd10_chapter":                   { "type": "keyword" },
+        "age_group":                       { "type": "keyword" },
+        "arrival_hour":                    { "type": "byte" },
+        "arrival_dow":                     { "type": "keyword" },
+        "arrival_month":                   { "type": "keyword" },
+        "los_computed_hours":              { "type": "float" },
+        "is_high_acuity":                  { "type": "boolean" },
+        "fever_flag":                      { "type": "boolean" },
+        "shock_index":                     { "type": "float" },
+
+        "dq": {
+          "properties": {
+            "status":             { "type": "keyword" },
+            "issue_count":        { "type": "byte" },
+            "issues":             { "type": "keyword" },
+            "anomaly_categories": { "type": "keyword" }
+          }
+        },
+        "ingest": {
+          "properties": {
+            "run_id":      { "type": "keyword" },
+            "pipeline":    { "type": "keyword" },
+            "source_file": { "type": "keyword" },
+            "ingested_at": { "type": "date" }
+          }
+        }
+      }
+    }
+  }
+}

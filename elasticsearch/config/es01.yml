@@ -1,0 +1,27 @@
+# ===================== Elasticsearch - ELK-01 (es01) =====================
+cluster.name: ed-analytics-cluster
+node.name: es01
+# Both nodes are master-eligible and hold data (2-node lab cluster)
+node.roles: [ master, data, ingest ]
+
+# --- Network -------------------------------------------------------------
+network.host: 0.0.0.0          # listen on the container interface
+http.port: 9200                # REST API (Kibana, Logstash, Spark, curl)
+transport.port: 9300           # node-to-node traffic (es01 <-> es02)
+
+# --- Discovery -----------------------------------------------------------
+discovery.seed_hosts: [ "es02" ]
+# Only used for the very first cluster bootstrap (ignored once the cluster exists)
+cluster.initial_master_nodes: [ "es01", "es02" ]
+
+# --- System --------------------------------------------------------------
+bootstrap.memory_lock: true    # no swapping of the JVM heap (ulimit memlock in compose)
+
+# --- Lab choices (documented in docs/architecture.md) --------------------
+# Security disabled: isolated Docker network, ports published on 127.0.0.1 only
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+# Not used by the project, saves memory
+xpack.ml.enabled: false
+# Docker Desktop virtual disks are often >90% "used": avoid read-only/unassigned shards
+cluster.routing.allocation.disk.threshold_enabled: false
