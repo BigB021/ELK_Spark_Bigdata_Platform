@@ -21,10 +21,12 @@ docker compose exec spark-master /opt/spark/bin/spark-submit /opt/spark/jobs/tp3
 
 - **Données :** `datasets/ed_synthetic_visits.csv` (5 000 lignes), lu directement par les executors.
 - **Traitement :** cast des types, filtre des lignes plausibles (ESI 1-5, LOS 0-72 h, disposition renseignée), puis 3 agrégations.
-- **Résultats :** dans `spark/output/tp3/` :
+- **Résultats CSV :** dans `spark/output/tp3/` :
   - `visits_by_disposition.csv` ;
   - `los_by_triage_acuity.csv` (moyenne et médiane de la LOS par ESI) ;
   - `admission_rate_by_transport.csv`.
+- Pour indexer aussi ces trois tableaux, ajouter `--packages $ES_SPARK_CONNECTOR` et
+  définir `TP3_WRITE_ES=true`.
 
 ## 3. Trois traitements analytiques pour le prochain jalon
 

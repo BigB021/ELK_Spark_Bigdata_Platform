@@ -43,6 +43,11 @@ Ordre garanti par les healthchecks :
 ## Vérifications rapides (TP3)
 
 ```powershell
+python scripts/check_assignments.py # vérifie les livrables TP3/TP4 sans Docker
+python scripts/status.py      # état de chaque service : conteneur + API (cluster, nœuds, index, Kibana, pipelines, Spark)
+```
+
+```powershell
 curl.exe "localhost:9200/_cat/nodes?v"                  # 2 nœuds, un master (*)
 curl.exe "localhost:9200/_cluster/health?pretty"        # status green, number_of_nodes 2
 curl.exe "localhost:9200/_cat/indices/ed-*?v"
@@ -72,6 +77,9 @@ Les refus d'Elasticsearch passent par la DLQ et arrivent dans `ed-rejects-dlq`.
 ```powershell
 # TP3 : CSV -> Spark -> résultats (spark/output/tp3/*.csv)
 docker compose exec spark-master /opt/spark/bin/spark-submit /opt/spark/jobs/tp3_first_job.py
+
+# Optionnel : ajouter --packages $ES_SPARK_CONNECTOR et TP3_WRITE_ES=true
+# pour indexer les trois tableaux de résultats dans Elasticsearch.
 
 # Préparation Jalon 3 : lecture de l'index ES nettoyé (spark/output/analytics/*.csv)
 docker compose exec spark-master bash -c '/opt/spark/bin/spark-submit --packages $ES_SPARK_CONNECTOR /opt/spark/jobs/ed_analytics_es.py'
@@ -105,6 +113,17 @@ python scripts/capture_screenshots.py "$D/6_captures"       # captures Kibana + 
 python scripts/render_report_pdf.py "$D/5_rapport/rapport_source.html" "$D/5_rapport/TP2_ELK_Spark_NomBinome.pdf"
 ```
 Les copies des fichiers sources (dossiers 1-4 et 7-9) sont décrites dans `TP2_ELK_Spark_NomBinome/README.md`.
+
+Les résultats TP3 sont écrits **en CSV** (`spark/output/`). Avec `TP3_WRITE_ES=true` et le connecteur,
+ils sont aussi écrits dans Elasticsearch. Les résultats analytiques TP4 sont écrits en CSV et dans Elasticsearch,
+un index par tableau, remplacé à chaque exécution. Dans Kibana, ils sont visibles via le data view « ED Spark analytics ».
+
+| Index | Contenu |
+|---|---|
+| `ed-analytics-tp3-disposition`, `-tp3-los-esi`, `-tp3-transport` | job TP3 (CSV brut) |
+| `ed-analytics-a1-triage` | A1 : statistiques par niveau ESI |
+| `ed-analytics-a2-weekday-hour`, `ed-analytics-a2-monthly` | A2 : affluence jour × heure (1 doc par créneau), tendance mensuelle |
+| `ed-analytics-a3-diagnoses` | A3 : diagnostics à risque |
 
 ## Arrêt / remise à zéro
 

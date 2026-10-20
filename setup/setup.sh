@@ -41,14 +41,18 @@ done
 log "waiting for Kibana..."
 until curl -s "$KB/api/status" | grep -q '"level":"available"'; do sleep 5; done
 
-create_view() { # id title name
+create_view() { # id title name [timeField] (no time field for result tables)
   log "data view $1 ($2)"
+  time_field=""
+  [ -n "${4:-}" ] && time_field=",\"timeFieldName\":\"$4\""
   curl -sf -X POST "$KB/api/data_views/data_view" \
        -H 'kbn-xsrf: setup' -H 'Content-Type: application/json' \
-       -d "{\"override\":true,\"data_view\":{\"id\":\"$1\",\"title\":\"$2\",\"name\":\"$3\",\"timeFieldName\":\"@timestamp\"}}" >/dev/null
+       -d "{\"override\":true,\"data_view\":{\"id\":\"$1\",\"title\":\"$2\",\"name\":\"$3\",\"allowNoIndex\":true$time_field}}" >/dev/null
 }
-create_view ed-visits  "ed-visits-*"  "ED visits (valid + warning)"
-create_view ed-rejects "ed-rejects-*" "ED rejected events"
+create_view ed-visits    "ed-visits-*"    "ED visits (valid + warning)" "@timestamp"
+create_view ed-rejects   "ed-rejects-*"   "ED rejected events"          "@timestamp"
+# Spark result tables (written by spark/jobs/*.py)
+create_view ed-analytics "ed-analytics-*" "ED Spark analytics"
 
 curl -sf -X POST "$KB/api/data_views/default" -H 'kbn-xsrf: setup' -H 'Content-Type: application/json' \
      -d '{"data_view_id":"ed-visits","force":true}' >/dev/null

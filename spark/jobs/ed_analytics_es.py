@@ -4,9 +4,11 @@
   A2  temporal analysis: arrivals per weekday x hour, monthly trend
   A3  business analysis: diagnoses with the highest admission / long-stay rates
 
+Results: CSV in /opt/spark/output/analytics/ AND Elasticsearch indices ed-analytics-a*
+(data view "ED Spark analytics" in Kibana).
+
 Run (the ES connector is downloaded on first use):
-  docker compose exec spark-master bash -c \
-    'spark-submit --packages $ES_SPARK_CONNECTOR /opt/spark/jobs/ed_analytics_es.py'
+  docker compose exec spark-master bash -c '/opt/spark/bin/spark-submit --packages $ES_SPARK_CONNECTOR /opt/spark/jobs/ed_analytics_es.py'
 """
 import csv
 import os
@@ -15,9 +17,18 @@ from pyspark.sql import SparkSession, functions as F
 
 INDEX = os.environ.get("ED_INDEX", "ed-visits-main")
 OUT_DIR = "/opt/spark/output/analytics"
+ES_OPTIONS = {"es.nodes": "es01,es02", "es.port": "9200", "es.nodes.wan.only": "true"}
 
 
-def save(df, name):
+def to_es(df, index):
+    """Writes a result table to its own index (replaced on every run)."""
+    df.write.format("org.elasticsearch.spark.sql").options(**ES_OPTIONS).mode("overwrite").save(index)
+    print(f"    -> Elasticsearch index {index}")
+
+
+def save(df, name, index, es_df=None):
+    """CSV file for the report + Elasticsearch index for Kibana (es_df: alternative shape for ES)."""
+    to_es(es_df if es_df is not None else df, index)
     rows = df.collect()
     os.makedirs(OUT_DIR, exist_ok=True)
     path = os.path.join(OUT_DIR, f"{name}.csv")
@@ -35,9 +46,7 @@ def main():
 
     visits = (
         spark.read.format("org.elasticsearch.spark.sql")
-        .option("es.nodes", "es01,es02")
-        .option("es.port", "9200")
-        .option("es.nodes.wan.only", "true")
+        .options(**ES_OPTIONS)
         .option("es.read.field.as.array.include", "dq.issues,dq.anomaly_categories")
         .load(INDEX)
         .withColumn("admitted", F.col("admitted_flag").cast("int"))
@@ -58,14 +67,16 @@ def main():
             F.round(F.avg("shock_index"), 2).alias("avg_shock_index"),
         )
         .orderBy("triage_acuity_esi"),
-        "a1_triage_statistics",
+        "a1_triage_statistics", "ed-analytics-a1-triage",
     )
 
     # A2 - temporal analysis
+    # CSV: 7 x 24 grid ; ES: one document per (weekday, hour), easier to chart in Kibana
     save(
         visits.groupBy("arrival_dow").pivot("arrival_hour", list(range(24))).count()
         .na.fill(0).orderBy("arrival_dow"),
-        "a2_arrivals_weekday_x_hour",
+        "a2_arrivals_weekday_x_hour", "ed-analytics-a2-weekday-hour",
+        es_df=visits.groupBy("arrival_dow", "arrival_hour").agg(F.count("*").alias("visits")),
     )
     save(
         visits.groupBy("arrival_month")
@@ -75,7 +86,7 @@ def main():
             F.round(100 * F.avg("admitted"), 1).alias("admission_rate_pct"),
         )
         .orderBy("arrival_month"),
-        "a2_monthly_trend",
+        "a2_monthly_trend", "ed-analytics-a2-monthly",
     )
 
     # A3 - business analysis: high-risk diagnoses (min 50 visits)
@@ -90,7 +101,7 @@ def main():
         )
         .filter(F.col("visits") >= 50)
         .orderBy(F.desc("admission_rate_pct"), F.desc("visits")),
-        "a3_high_risk_diagnoses",
+        "a3_high_risk_diagnoses", "ed-analytics-a3-diagnoses",
     )
 
     spark.stop()
