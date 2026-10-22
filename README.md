@@ -1,4 +1,4 @@
-# Plateforme Big Data ED : ELK + Spark (TP3 & TP4)
+# Plateforme Big Data ED : ELK + Spark
 
 Plateforme d'analyse et de supervision des passages aux **urgences** (jeu de données synthétique
 dérivé de MIMIC-IV-ED demo). Tout tourne avec **Docker Compose** : chaque « machine » du TP est un
